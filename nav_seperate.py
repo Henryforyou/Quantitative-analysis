@@ -84,5 +84,5 @@ if __name__ == '__main__':
             future_result = pool.submit(nav_seperate, month, N)
             future_result.add_done_callback(when_done)
     time_end=time.time()
-    print (time_end-time_start, 's')
-    #read_csv()
+    print (time_end-time_start, 's')   #testing the speed
+    read_csv()
