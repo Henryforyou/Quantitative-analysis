@@ -6,4 +6,4 @@ during some time spans. This is used for backtesting and this is the first time 
 in a year. For privacy policy, I would not provide source csv docs since they are very sensitive. 
 
 
-2/2 Update for nav_seperate.py: Revised the some algorithms in order to improve the performace under intel python.   
+2/2/2018 Update for nav_seperate.py: Revised the some algorithms in order to improve the performace under intel python.   
