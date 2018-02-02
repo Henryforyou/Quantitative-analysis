@@ -1,20 +1,26 @@
+# This py file is used for backtesting
+
 import gc
 import sys, time, datetime, os, importlib, math, pandas as pd, numpy as np
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+
 global fn,stockpricehis,result
 result = []
 
 fn = 'CSVKlineHist.csv'
-stockpricehis = pd.read_csv(fn, parse_dates=[1,2])
-stockpricehis.set_index(['code','tradingday','timekey'], inplace=True)
+stockpricehis = pd.read_csv(fn, parse_dates=[1,2],index_col=[0,1])
 stockpricehis.sort_index(inplace=True)
 
 
 def nav_seperate(month, N):
+    '''
+    This function is used to calculate daily NAV change for each portfolio
+    '''
     global fn,stockpricehis
     #for month in month:
-    portfolio_nav_files =[]
+    idx = pd.IndexSlice
+    portfolio_nav_files = []
     for files in list(filter(lambda x: x.startswith(month), os.listdir('./Portfolio/'))):
 
         portfolio_nav = []
@@ -25,23 +31,24 @@ def nav_seperate(month, N):
             date = date + datetime.timedelta(days=1)
         if date > tradingdays[-1]:
             continue
+#        print(files,time.time())
         date30 = tradingdays[min(tradingdays.index(date)+ N,len(tradingdays)-1)]
-        temp = stockpricehis.query("code in @portfolio and tradingday >= @date and tradingday <= @date30").reset_index('timekey')[['c']]
-        for i in portfolio:
-            nav = temp.loc[i]
-            if len(nav) > 0:
-                nav['i'] = nav['c'] / nav['c'][0]
-                nav = nav[['i']][1:].T
-                nav.index = [i]
-            else:
-                nav = nav.T
-                nav.index = [i]
-            portfolio_nav.append(nav)
-        NAV = pd.DataFrame(pd.concat(portfolio_nav).mean()).T
+#        print(files,time.time())
+
+        temp = stockpricehis.loc[idx[portfolio,date:date30],:][['c']]
+#       print(files,time.time())
+        temp = temp.groupby(level=0).apply(lambda x: x.c[1:]/x.c.shift(1)[1:]).reset_index(level=0)[['c']].unstack()
+        levels = temp.columns.levels
+        labels = temp.columns.labels
+        temp.columns = levels[1][labels[1]]
+        temp.index.name = None
+        NAV = pd.DataFrame(temp.mean()).T
         index_nav = [datetime.datetime.strptime(files[:-4],'%Y%m%d').strftime('%Y-%m-%d')+' portfolio NAV']
         NAV.index = index_nav
-        save_nav = pd.concat(portfolio_nav+[NAV])
+        save_nav = pd.concat([temp,NAV])
         save_nav = save_nav.rename(columns = {i:'Day_'+ str(list(save_nav.columns).index(i)).rjust(3,'0') for i in save_nav.columns})
+
+
         K = len(save_nav.columns)
         save_nav['NAV_Max'] = save_nav.max(axis = 1)
         save_nav['NAV_Min'] = save_nav.min(axis = 1)
@@ -58,31 +65,42 @@ def nav_seperate(month, N):
     pd.concat(portfolio_nav_files).to_csv('./Result/'+month + '.csv')
 
 def when_done(r):
+    '''
+    This function is used for controlling multiprocessing
+    '''
     global result
     result.append(r.result())
 
 def read_csv():
+    '''
+    This function is for concatting the NAV change for each portfolio into one csv file
+    '''
     filelist = os.listdir('./Result/')
     nav_result = []
     for files in filelist:
         nav_data = pd.read_csv('./Result/'+files)
         nav_data['NAV'] = nav_data['Unnamed: 0'].str.contains('NAV')
-        nav_result.append(nav_data.query('NAV == True').drop('NAV',axis = 1))
+        nav_result.append(nav_data[nav_data['NAV']].drop('NAV',axis = 1))
     nav = pd.concat(nav_result).set_index('Unnamed: 0')
     mn = pd.DataFrame(nav.mean()).T
     mn.index = ['mean']
     pd.concat([nav, mn]).to_csv('nav_his.csv')
 
 if __name__ == '__main__':
+    time_start = time.time()
     gc.collect()
 
-    month = ['201701','201702','201703','201704','201705','201706','201707','201708','201709','201710','201711','201712']
+    month = ['201501','201502','201503','201504','201505','201506','201507','201508','201509','201510','201511','201512',
+    '201601','201602','201603','201604','201605','201606','201607','201608','201609','201610','201611','201612',
+    '201701','201702','201703','201704','201705','201706','201707','201708','201709','201710','201711','201712']
     N = 30
-    time_start = time.time()
-    with ProcessPoolExecutor() as pool:
+
+    with ProcessPoolExecutor(max_workers =4) as pool:   #entering multiprocessing
+
         for month in month:
+
             future_result = pool.submit(nav_seperate, month, N)
             future_result.add_done_callback(when_done)
-    time_end=time.time()
-    print (time_end-time_start, 's')   #testing the speed
     read_csv()
+    time_end=time.time()
+    print (time_end-time_start, 's')
