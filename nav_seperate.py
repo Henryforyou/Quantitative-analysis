@@ -37,7 +37,7 @@ def nav_seperate(month, N):
 
         temp = stockpricehis.loc[idx[portfolio,date:date30],:][['c']]
 #       print(files,time.time())
-        temp = temp.groupby(level=0).apply(lambda x: x.c[1:]/x.c.shift(1)[1:]).reset_index(level=0)[['c']].unstack()
+        temp = temp.groupby(level=0).apply(lambda x: x.c[1:]/x.c[0]).reset_index(level=0)[['c']].unstack()
         levels = temp.columns.levels
         labels = temp.columns.labels
         temp.columns = levels[1][labels[1]]
